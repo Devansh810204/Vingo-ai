@@ -1,3 +1,4 @@
+/* server.js */
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
@@ -5,40 +6,69 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
 
-// Serve files from the 'public' folder
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Store user info: { socketId: { roomId, username, lang } }
+const users = {}; 
 
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-    // 1. Join Room Logic
-    socket.on('join-room', (roomId, userId) => {
+    socket.on('join-room', (roomId, username, myLang) => {
         socket.join(roomId);
-        // Notify others in the room
-        socket.to(roomId).emit('user-connected', userId);
+        users[socket.id] = { roomId, username, myLang };
 
+        // Tell everyone else in the room that a new user joined, sending their name
+        socket.to(roomId).emit('user-connected', {
+            userId: socket.id,
+            username: username
+        });
+
+        // Handle disconnect
         socket.on('disconnect', () => {
-            socket.to(roomId).emit('user-disconnected', userId);
+            socket.to(roomId).emit('user-disconnected', socket.id);
+            delete users[socket.id];
         });
     });
 
-    // 2. WebRTC Signaling (Video Connection)
-    socket.on('offer', (data) => socket.broadcast.emit('offer', data));
-    socket.on('answer', (data) => socket.broadcast.emit('answer', data));
-    socket.on('ice-candidate', (data) => socket.broadcast.emit('ice-candidate', data));
+    // Handle Signaling (Offer/Answer/Ice) - Directed to specific user
+    socket.on('offer', (data) => {
+        io.to(data.target).emit('offer', {
+            offer: data.offer,
+            callerId: socket.id,
+            callerName: users[socket.id]?.username || "Unknown"
+        });
+    });
 
-    // 3. Translation Data Transfer
+    socket.on('answer', (data) => {
+        io.to(data.target).emit('answer', {
+            answer: data.answer,
+            responderId: socket.id
+        });
+    });
+
+    socket.on('ice-candidate', (data) => {
+        io.to(data.target).emit('ice-candidate', {
+            candidate: data.candidate,
+            senderId: socket.id
+        });
+    });
+
+    // Handle Translation Data (Broadcast to room)
     socket.on('speak-data', (data) => {
-        // Broadcast the text to the other person
+        // data contains: { roomId, text, sourceLang, username }
         socket.broadcast.to(data.roomId).emit('receive-speak-data', data);
     });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-    console.log(`Access from other devices: http://YOUR_LOCAL_IP:${PORT}`);
-    console.log(`For mobile devices: Use Chrome and enable 'Insecure content' in settings`);
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
