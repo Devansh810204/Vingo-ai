@@ -1,19 +1,22 @@
 const socket = io();
 
-// Variables
+// --- CONFIGURATION ---
+const API_URL = "https://api.mymemory.translated.net/get";
+const STUN_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+// --- STATE VARIABLES ---
 let localStream;
-let myUsername = "User"; // Default
+let myUsername = "User-" + Math.floor(Math.random() * 1000);
 let roomId = "";
 let myLang = "en-US";
 let listenLang = "en-US";
 let recognition;
-let isMuted = true;
-let isVideoOff = true;
 let subtitlesOn = true;
 const peers = {};
 
-// STUN Configuration (Google's free servers)
-const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+// --- CHANGED: Default Media State to OFF ---
+let isMuted = true;      // Start Muted
+let isVideoOff = true;   // Start with Camera Off
 
 // --- 1. SETUP & NAVIGATION ---
 
@@ -22,12 +25,8 @@ function goToSetup() {
     if (input.value.trim()) myUsername = input.value;
     else return alert("Please enter your name");
     
-    switchScreen('login-screen', 'setup-screen');
-}
-
-function switchScreen(from, to) {
-    document.getElementById(from).classList.remove('active');
-    document.getElementById(to).classList.add('active');
+    document.getElementById('login-screen').classList.remove('active');
+    document.getElementById('setup-screen').classList.add('active');
 }
 
 function toggleSettings() {
@@ -38,35 +37,58 @@ async function joinRoom() {
     roomId = document.getElementById('room-id').value;
     if (!roomId) return alert("Please enter a Room ID");
 
-    // Get Languages
+    // Get selected languages
     myLang = document.getElementById('setup-my-lang').value;
     listenLang = document.getElementById('setup-listen-lang').value;
     
-    // Sync to in-call settings
+    // Sync UI
     document.getElementById('in-call-my-lang').value = myLang;
     document.getElementById('in-call-listen-lang').value = listenLang;
 
-    // Switch UI
-    switchScreen('setup-screen', 'call-screen');
+    // Switch Screens
+    document.getElementById('setup-screen').classList.remove('active');
+    document.getElementById('call-screen').classList.add('active');
     document.getElementById('display-room-id').innerText = roomId;
     document.querySelector('#local-wrapper .label').innerText = "You";
 
-    // 1. Get Media
     try {
+        // 1. Get Media Stream (We must ask for permission first)
         localStream = await navigator.mediaDevices.getUserMedia({ 
             video: true, 
             audio: { echoCancellation: true, noiseSuppression: true } 
         });
+
+        // 2. IMMEDIATELY TURN OFF TRACKS (Default Off)
+        localStream.getAudioTracks()[0].enabled = false;
+        localStream.getVideoTracks()[0].enabled = false;
+
+        // 3. Update UI to show they are OFF
+        updateInitialButtonState();
+
         document.getElementById('local-video').srcObject = localStream;
         
-        // 2. Start Logic
+        // 4. Initialize Logic
         initSpeechRecognition();
         socket.emit('join-room', roomId, myUsername, myLang);
 
     } catch (err) {
         console.error("Media Error:", err);
-        alert("⚠️ Camera/Mic Error: " + err.message + "\nCheck browser permissions.");
+        alert("⚠️ Camera/Mic Error: " + err.message);
     }
+}
+
+// New Helper to set button colors correctly on load
+function updateInitialButtonState() {
+    const muteBtn = document.getElementById('mute-btn');
+    const videoBtn = document.getElementById('video-btn');
+
+    // Mute Button: Show Red (Off)
+    muteBtn.innerHTML = "<span>🔴</span>";
+    muteBtn.classList.remove('active'); // Remove 'active' (green) style
+
+    // Video Button: Show Red (Off)
+    videoBtn.innerHTML = "<span>🚫</span>";
+    videoBtn.classList.add('danger');   // Add 'danger' (red) style
 }
 
 function updateLanguages() {
@@ -74,120 +96,86 @@ function updateLanguages() {
     listenLang = document.getElementById('in-call-listen-lang').value;
     
     if (recognition) {
-        recognition.stop();
-        // It will restart automatically in 'onend' with new language
+        recognition.stop(); 
     }
     toggleSettings();
 }
 
-// --- 2. SPEECH RECOGNITION (The Critical Part) ---
+// --- 2. SPEECH RECOGNITION ---
 
 function initSpeechRecognition() {
-    // 1. Browser Check
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        alert("⚠️ Voice AI not supported on this browser. Please use Google Chrome or Edge Desktop.");
-        return;
-    }
+    if (!SpeechRecognition) return alert("Browser not supported. Use Chrome.");
 
     recognition = new SpeechRecognition();
     recognition.lang = myLang;
     recognition.continuous = true; 
     recognition.interimResults = false;
 
-    recognition.onstart = () => console.log("🟢 Voice AI Listening...");
+    recognition.onstart = () => console.log("🟢 Listening...");
+    recognition.onerror = (e) => console.error("🔴 AI Error:", e.error);
     
-    recognition.onerror = (event) => {
-        console.error("🔴 Voice AI Error:", event.error);
-        if(event.error === 'not-allowed') alert("Microphone access blocked. Click the Lock icon 🔒 in the URL bar.");
-    };
-
     recognition.onend = () => {
-        console.log("🟡 Voice AI Stopped. Restarting...");
-        // Only restart if the user hasn't explicitly muted themselves
+        // Only restart if user is NOT muted
         if(!isMuted) {
-            try { recognition.start(); } catch(e) { console.warn("Restart failed/ignored"); }
+            try { recognition.start(); } catch(e) {}
         }
     };
 
     recognition.onresult = (event) => {
         const last = event.results.length - 1;
         const text = event.results[last][0].transcript;
-        
-        console.log(`🎤 I said: ${text}`); // Debug Log
-        
-        // Emit to Server
-        socket.emit('speak-data', {
-            roomId: roomId,
-            text: text,
-            sourceLang: myLang,
-            username: myUsername
-        });
+        socket.emit('speak-data', { roomId, text, sourceLang: myLang, username: myUsername });
     };
 
-    try { recognition.start(); } catch(e) { console.warn("Start failed/ignored"); }
+    // START ONLY IF UNMUTED (Since we default to muted, this won't run initially)
+    if(!isMuted) {
+        try { recognition.start(); } catch(e) {}
+    }
 }
 
-// --- 3. RECEIVING & TRANSLATING ---
+// --- 3. TRANSLATION ---
 
 socket.on('receive-speak-data', async (data) => {
-    console.log(`📩 Received from ${data.username}: ${data.text}`);
-    
-    let finalText = data.text; // Default to original text
+    let finalText = data.text;
+    const sourceCode = data.sourceLang.split('-')[0];
+    const targetCode = listenLang.split('-')[0];
 
-    // 1. Try Translation (Only if languages differ)
-    if(data.sourceLang.split('-')[0] !== listenLang.split('-')[0]) {
+    if (sourceCode !== targetCode) {
         try {
-            finalText = await translateText(data.text, data.sourceLang, listenLang);
+            finalText = await translateText(data.text, sourceCode, targetCode);
         } catch (err) {
-            console.error("Translation Failed (Using original text):", err);
+            // Fallback to original text
         }
     }
 
-    // 2. Update Subtitles (Force Display)
-    if(subtitlesOn) {
-        const subContainer = document.getElementById('subtitle-container');
-        const subText = document.getElementById('subtitle-text');
-        
-        // Update Content
-        subText.innerHTML = `<span style="color:#2ed573; font-weight:bold;">${data.username}:</span> ${finalText}`;
-        subText.style.opacity = 1;
-
-        // Auto-Hide
-        setTimeout(() => { 
-            if(subText.innerHTML.includes(finalText)) subText.style.opacity = 0; 
-        }, 6000);
+    if (subtitlesOn) {
+        const subBox = document.getElementById('subtitle-text');
+        subBox.innerHTML = `<span style="color:#2ed573; font-weight:bold;">${data.username}:</span> ${finalText}`;
+        subBox.style.opacity = 1;
+        setTimeout(() => { if(subBox.innerHTML.includes(finalText)) subBox.style.opacity = 0; }, 6000);
     }
 
-    // 3. Speak (TTS)
     speakText(finalText, listenLang);
 });
 
 async function translateText(text, source, target) {
-    const src = source.split('-')[0];
-    const tgt = target.split('-')[0];
-
-    // Using MyMemory API (HTTPS)
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${src}|${tgt}`;
-    
+    const url = `${API_URL}?q=${encodeURIComponent(text)}&langpair=${source}|${target}`;
     const res = await fetch(url);
     const data = await res.json();
-    
-    if(data.responseStatus === 200) return data.responseData.translatedText;
-    
-    console.warn("API Error:", data.responseDetails);
-    return text; // Return original if API fails
+    if (data.responseStatus === 200) return data.responseData.translatedText;
+    throw new Error(data.responseDetails);
 }
 
 function speakText(text, lang) {
-    if(!window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); // Stop previous
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang;
     window.speechSynthesis.speak(u);
 }
 
-// --- 4. WEBRTC (Standard) ---
+// --- 4. WEBRTC ---
 
 socket.on('user-connected', async (data) => {
     const pc = createPeer(data.userId, data.username);
@@ -222,7 +210,7 @@ socket.on('user-disconnected', (userId) => {
 });
 
 function createPeer(userId, username) {
-    const pc = new RTCPeerConnection(config);
+    const pc = new RTCPeerConnection(STUN_CONFIG);
     localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
     pc.ontrack = (event) => {
@@ -257,33 +245,29 @@ function createPeer(userId, username) {
 function toggleMute() {
     isMuted = !isMuted;
     
-    // 1. Mute/Unmute the actual Microphone Audio Track
-    if (localStream && localStream.getAudioTracks().length > 0) {
-        localStream.getAudioTracks()[0].enabled = !isMuted;
-    }
-
-    // 2. Update Button UI
+    // Toggle Track
+    if (localStream) localStream.getAudioTracks()[0].enabled = !isMuted;
+    
+    // Toggle UI
     const btn = document.getElementById('mute-btn');
     btn.innerHTML = isMuted ? "<span>🔴</span>" : "<span>🎤</span>";
     btn.classList.toggle('active', !isMuted);
-    
-    // 3. Handle Speech Recognition Safely (FIXED)
-    if (isMuted) {
-        // If muted, stop listening
-        try { recognition.stop(); } catch(e) { console.warn("Already stopped"); }
+
+    // Toggle AI
+    if(isMuted) {
+        try { recognition.stop(); } catch(e) {}
     } else {
-        // If unmuted, start listening ONLY if not already started
-        try { 
-            recognition.start(); 
-        } catch(e) { 
-            console.warn("Recognition already active, ignoring start request."); 
-        }
+        try { recognition.start(); } catch(e) {}
     }
 }
 
 function toggleVideo() {
     isVideoOff = !isVideoOff;
-    localStream.getVideoTracks()[0].enabled = !isVideoOff;
+    
+    // Toggle Track
+    if (localStream) localStream.getVideoTracks()[0].enabled = !isVideoOff;
+    
+    // Toggle UI
     const btn = document.getElementById('video-btn');
     btn.innerHTML = isVideoOff ? "<span>🚫</span>" : "<span>📷</span>";
     btn.classList.toggle('danger', isVideoOff);
