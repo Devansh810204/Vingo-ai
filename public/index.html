@@ -1,19 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Vingo AI - Global Connect</title>
     <link rel="stylesheet" href="style.css">
     <script src="/socket.io/socket.io.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="icon" href="data:,">
 </head>
+
 <body>
 
     <div id="login-screen" class="screen active">
         <div class="glass-card">
-            <h1>Vingo AI 🌍</h1>
+            <h1>Vingo AI</h1>
             <p>Connect. Speak. Understand.</p>
             <input type="text" id="username" placeholder="Enter your name">
             <button onclick="goToSetup()">Start Experience</button>
@@ -24,7 +26,7 @@
         <div class="glass-card">
             <h2>Room Setup</h2>
             <input type="text" id="room-id" placeholder="Create Room Code (e.g. 101)">
-            
+
             <div class="lang-group">
                 <label>🗣️ I Speak:</label>
                 <select id="setup-my-lang">
@@ -54,9 +56,13 @@
     </div>
 
     <div id="call-screen" class="screen">
-        
+
         <div class="top-bar">
             <div class="room-tag">Room: <span id="display-room-id">...</span></div>
+            <div id="ai-status" class="ai-status">
+                <span class="status-dot"></span>
+                <span id="ai-status-text">AI Initializing...</span>
+            </div>
             <button class="settings-btn" onclick="toggleSettings()">⚙️ Language</button>
         </div>
 
@@ -88,10 +94,12 @@
                 <video id="local-video" autoplay muted playsinline></video>
                 <span class="label">You</span>
             </div>
-            </div>
+        </div>
 
         <div id="subtitle-container">
-            <p id="subtitle-text">Waiting for Captions...</p>
+            <div class="glass-subtitle">
+                <p id="subtitle-text">Waiting for Captions...</p>
+            </div>
         </div>
 
         <div class="controls-bar">
@@ -115,4 +123,5 @@
 
     <script src="script.js"></script>
 </body>
+
 </html>
