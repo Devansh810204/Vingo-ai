@@ -113,11 +113,19 @@ function initSpeechRecognition() {
     recognition.continuous = true;
     recognition.interimResults = false;
 
-    recognition.onstart = () => console.log("🟢 Listening...");
-    recognition.onerror = (e) => console.error("🔴 AI Error:", e.error);
+    recognition.onstart = () => {
+        setAIStatus('listening', 'AI Listening...');
+        document.getElementById('local-wrapper').classList.add('speaking');
+    };
+
+    recognition.onerror = (e) => {
+        setAIStatus('', 'AI Standby');
+        document.getElementById('local-wrapper').classList.remove('speaking');
+    };
 
     recognition.onend = () => {
-        // Only restart if user is NOT muted
+        document.getElementById('local-wrapper').classList.remove('speaking');
+        setAIStatus('', 'AI Standby');
         if (!isMuted) {
             try { recognition.start(); } catch (e) { }
         }
@@ -129,10 +137,19 @@ function initSpeechRecognition() {
         socket.emit('speak-data', { roomId, text, sourceLang: myLang, username: myUsername });
     };
 
-    // START ONLY IF UNMUTED (Since we default to muted, this won't run initially)
     if (!isMuted) {
         try { recognition.start(); } catch (e) { }
     }
+}
+
+// Helper to update AI Status UI
+function setAIStatus(state, text) {
+    const dot = document.querySelector('.status-dot');
+    const label = document.getElementById('ai-status-text');
+    if (!dot || !label) return;
+
+    dot.className = 'status-dot ' + state;
+    label.innerText = text;
 }
 
 // --- 3. TRANSLATION ---
@@ -142,19 +159,33 @@ socket.on('receive-speak-data', async (data) => {
     const sourceCode = data.sourceLang.split('-')[0];
     const targetCode = listenLang.split('-')[0];
 
+    // Show visual indicator that someone is speaking
+    const wrapper = document.getElementById(`wrapper-${data.userId}`);
+    if (wrapper) wrapper.classList.add('speaking');
+
     if (sourceCode !== targetCode) {
+        setAIStatus('translating', 'AI Translating...');
         try {
             finalText = await translateText(data.text, sourceCode, targetCode);
         } catch (err) {
-            // Fallback to original text
+            console.error(err);
         }
+        setAIStatus('listening', 'AI Listening...');
     }
+
+    if (wrapper) setTimeout(() => wrapper.classList.remove('speaking'), 3000);
 
     if (subtitlesOn) {
         const subBox = document.getElementById('subtitle-text');
-        subBox.innerHTML = `<span style="color:#2ed573; font-weight:bold;">${data.username}:</span> ${finalText}`;
-        subBox.style.opacity = 1;
-        setTimeout(() => { if (subBox.innerHTML.includes(finalText)) subBox.style.opacity = 0; }, 6000);
+        const container = document.querySelector('.glass-subtitle');
+        subBox.innerHTML = `<span style="color:var(--primary); font-weight:bold;">${data.username}:</span> ${finalText}`;
+        if (container) container.style.opacity = 1;
+
+        setTimeout(() => {
+            if (subBox.innerHTML.includes(finalText) && container) {
+                container.style.opacity = 0;
+            }
+        }, 6000);
     }
 
     speakText(finalText, listenLang);
@@ -164,7 +195,14 @@ async function translateText(text, source, target) {
     const url = `${API_URL}&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
     const res = await fetch(url);
     const data = await res.json();
-    if (data && data[0] && data[0][0]) return data[0][0][0];
+
+    if (data && data[0]) {
+        // Google translate returns an array of sentences if the input is long. 
+        // Example: [ ["Hello.", "Bonjour.", ...], ["How are you?", "Comment..."] ]
+        // We must map through the array and join the first element of each inner array.
+        let fullTranslation = data[0].map(item => item[0]).join(' ');
+        return fullTranslation;
+    }
     throw new Error("Translation failed");
 }
 
@@ -255,10 +293,12 @@ function toggleMute() {
     btn.innerHTML = isMuted ? "<span>🔴</span>" : "<span>🎤</span>";
     btn.classList.toggle('active', !isMuted);
 
-    // Toggle AI
     if (isMuted) {
+        setAIStatus('', 'AI Standby');
+        document.getElementById('local-wrapper').classList.remove('speaking');
         try { recognition.stop(); } catch (e) { }
     } else {
+        setAIStatus('listening', 'AI Listening...');
         try { recognition.start(); } catch (e) { }
     }
 }
