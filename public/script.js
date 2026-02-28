@@ -1,7 +1,7 @@
 const socket = io();
 
 // --- CONFIGURATION ---
-const API_URL = "https://api.mymemory.translated.net/get";
+const API_URL = "https://translate.googleapis.com/translate_a/single?client=gtx";
 const STUN_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 // --- STATE VARIABLES ---
@@ -17,6 +17,7 @@ const peers = {};
 // --- CHANGED: Default Media State to OFF ---
 let isMuted = true;      // Start Muted
 let isVideoOff = true;   // Start with Camera Off
+let originalAudioOn = false; // Start with Original Audio muted
 
 // --- 1. SETUP & NAVIGATION ---
 
@@ -24,7 +25,7 @@ function goToSetup() {
     const input = document.getElementById('username');
     if (input.value.trim()) myUsername = input.value;
     else return alert("Please enter your name");
-    
+
     document.getElementById('login-screen').classList.remove('active');
     document.getElementById('setup-screen').classList.add('active');
 }
@@ -40,7 +41,7 @@ async function joinRoom() {
     // Get selected languages
     myLang = document.getElementById('setup-my-lang').value;
     listenLang = document.getElementById('setup-listen-lang').value;
-    
+
     // Sync UI
     document.getElementById('in-call-my-lang').value = myLang;
     document.getElementById('in-call-listen-lang').value = listenLang;
@@ -53,9 +54,9 @@ async function joinRoom() {
 
     try {
         // 1. Get Media Stream (We must ask for permission first)
-        localStream = await navigator.mediaDevices.getUserMedia({ 
-            video: true, 
-            audio: { echoCancellation: true, noiseSuppression: true } 
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: { echoCancellation: true, noiseSuppression: true }
         });
 
         // 2. IMMEDIATELY TURN OFF TRACKS (Default Off)
@@ -66,7 +67,7 @@ async function joinRoom() {
         updateInitialButtonState();
 
         document.getElementById('local-video').srcObject = localStream;
-        
+
         // 4. Initialize Logic
         initSpeechRecognition();
         socket.emit('join-room', roomId, myUsername, myLang);
@@ -94,9 +95,9 @@ function updateInitialButtonState() {
 function updateLanguages() {
     myLang = document.getElementById('in-call-my-lang').value;
     listenLang = document.getElementById('in-call-listen-lang').value;
-    
+
     if (recognition) {
-        recognition.stop(); 
+        recognition.stop();
     }
     toggleSettings();
 }
@@ -109,16 +110,16 @@ function initSpeechRecognition() {
 
     recognition = new SpeechRecognition();
     recognition.lang = myLang;
-    recognition.continuous = true; 
+    recognition.continuous = true;
     recognition.interimResults = false;
 
     recognition.onstart = () => console.log("🟢 Listening...");
     recognition.onerror = (e) => console.error("🔴 AI Error:", e.error);
-    
+
     recognition.onend = () => {
         // Only restart if user is NOT muted
-        if(!isMuted) {
-            try { recognition.start(); } catch(e) {}
+        if (!isMuted) {
+            try { recognition.start(); } catch (e) { }
         }
     };
 
@@ -129,8 +130,8 @@ function initSpeechRecognition() {
     };
 
     // START ONLY IF UNMUTED (Since we default to muted, this won't run initially)
-    if(!isMuted) {
-        try { recognition.start(); } catch(e) {}
+    if (!isMuted) {
+        try { recognition.start(); } catch (e) { }
     }
 }
 
@@ -153,23 +154,23 @@ socket.on('receive-speak-data', async (data) => {
         const subBox = document.getElementById('subtitle-text');
         subBox.innerHTML = `<span style="color:#2ed573; font-weight:bold;">${data.username}:</span> ${finalText}`;
         subBox.style.opacity = 1;
-        setTimeout(() => { if(subBox.innerHTML.includes(finalText)) subBox.style.opacity = 0; }, 6000);
+        setTimeout(() => { if (subBox.innerHTML.includes(finalText)) subBox.style.opacity = 0; }, 6000);
     }
 
     speakText(finalText, listenLang);
 });
 
 async function translateText(text, source, target) {
-    const url = `${API_URL}?q=${encodeURIComponent(text)}&langpair=${source}|${target}`;
+    const url = `${API_URL}&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
     const res = await fetch(url);
     const data = await res.json();
-    if (data.responseStatus === 200) return data.responseData.translatedText;
-    throw new Error(data.responseDetails);
+    if (data && data[0] && data[0][0]) return data[0][0][0];
+    throw new Error("Translation failed");
 }
 
 function speakText(text, lang) {
     if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
+    // Removed window.speechSynthesis.cancel() so sentences queue up nicely
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang;
     window.speechSynthesis.speak(u);
@@ -195,18 +196,18 @@ socket.on('offer', async (data) => {
 });
 
 socket.on('answer', async (data) => {
-    if(peers[data.responderId]) await peers[data.responderId].setRemoteDescription(data.answer);
+    if (peers[data.responderId]) await peers[data.responderId].setRemoteDescription(data.answer);
 });
 
 socket.on('ice-candidate', async (data) => {
-    if(peers[data.senderId]) await peers[data.senderId].addIceCandidate(data.candidate);
+    if (peers[data.senderId]) await peers[data.senderId].addIceCandidate(data.candidate);
 });
 
 socket.on('user-disconnected', (userId) => {
-    if(peers[userId]) peers[userId].close();
+    if (peers[userId]) peers[userId].close();
     delete peers[userId];
     const el = document.getElementById(`wrapper-${userId}`);
-    if(el) el.remove();
+    if (el) el.remove();
 });
 
 function createPeer(userId, username) {
@@ -218,12 +219,13 @@ function createPeer(userId, username) {
             const div = document.createElement('div');
             div.className = 'video-wrapper';
             div.id = `wrapper-${userId}`;
-            
+
             const vid = document.createElement('video');
             vid.srcObject = event.streams[0];
             vid.autoplay = true;
             vid.playsInline = true;
-            
+            vid.muted = !originalAudioOn; // Mute based on state
+
             const lbl = document.createElement('span');
             lbl.className = 'label';
             lbl.innerText = username;
@@ -233,9 +235,9 @@ function createPeer(userId, username) {
             document.getElementById('video-grid').appendChild(div);
         }
     };
-    
+
     pc.onicecandidate = (e) => {
-        if(e.candidate) socket.emit('ice-candidate', { target: userId, candidate: e.candidate });
+        if (e.candidate) socket.emit('ice-candidate', { target: userId, candidate: e.candidate });
     };
     return pc;
 }
@@ -244,29 +246,29 @@ function createPeer(userId, username) {
 
 function toggleMute() {
     isMuted = !isMuted;
-    
+
     // Toggle Track
     if (localStream) localStream.getAudioTracks()[0].enabled = !isMuted;
-    
+
     // Toggle UI
     const btn = document.getElementById('mute-btn');
     btn.innerHTML = isMuted ? "<span>🔴</span>" : "<span>🎤</span>";
     btn.classList.toggle('active', !isMuted);
 
     // Toggle AI
-    if(isMuted) {
-        try { recognition.stop(); } catch(e) {}
+    if (isMuted) {
+        try { recognition.stop(); } catch (e) { }
     } else {
-        try { recognition.start(); } catch(e) {}
+        try { recognition.start(); } catch (e) { }
     }
 }
 
 function toggleVideo() {
     isVideoOff = !isVideoOff;
-    
+
     // Toggle Track
     if (localStream) localStream.getVideoTracks()[0].enabled = !isVideoOff;
-    
+
     // Toggle UI
     const btn = document.getElementById('video-btn');
     btn.innerHTML = isVideoOff ? "<span>🚫</span>" : "<span>📷</span>";
@@ -276,6 +278,21 @@ function toggleVideo() {
 function toggleSubtitles() {
     subtitlesOn = !subtitlesOn;
     document.getElementById('cc-btn').classList.toggle('active', subtitlesOn);
+}
+
+function toggleOriginalAudio() {
+    originalAudioOn = !originalAudioOn;
+
+    // Toggle all remote videos' mute state
+    const remoteVideos = document.querySelectorAll('#video-grid .video-wrapper:not(#local-wrapper) video');
+    remoteVideos.forEach(vid => {
+        vid.muted = !originalAudioOn;
+    });
+
+    const btn = document.getElementById('audio-btn');
+    btn.innerHTML = originalAudioOn ? "<span>🔊</span>" : "<span>🔇</span>";
+    btn.classList.toggle('danger', !originalAudioOn);
+    btn.classList.toggle('active', originalAudioOn);
 }
 
 function leaveCall() {
