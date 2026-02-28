@@ -144,7 +144,7 @@ function initSpeechRecognition() {
     recognition = new SpeechRecognition();
     recognition.lang = myLang;
     recognition.continuous = true;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
 
     recognition.onstart = () => {
         setAIStatus('listening', 'AI Listening...');
@@ -164,10 +164,28 @@ function initSpeechRecognition() {
         }
     };
 
+    let lastInterimEmit = 0;
     recognition.onresult = (event) => {
-        const last = event.results.length - 1;
-        const text = event.results[last][0].transcript;
-        socket.emit('speak-data', { roomId, text, sourceLang: myLang, username: myUsername });
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript;
+            } else {
+                interimTranscript += event.results[i][0].transcript;
+            }
+        }
+
+        if (finalTranscript.trim() !== '') {
+            socket.emit('speak-data', { roomId, text: finalTranscript.trim(), sourceLang: myLang, username: myUsername, isFinal: true });
+        } else if (interimTranscript.trim() !== '') {
+            const now = Date.now();
+            if (now - lastInterimEmit > 1000) { // Limit live translation to once per second to prevent API bans
+                lastInterimEmit = now;
+                socket.emit('speak-data', { roomId, text: interimTranscript.trim(), sourceLang: myLang, username: myUsername, isFinal: false });
+            }
+        }
     };
 
     if (!isMuted) {
@@ -187,6 +205,8 @@ function setAIStatus(state, text) {
 
 // --- 3. TRANSLATION ---
 
+let subtitleCounter = 0;
+
 socket.on('receive-speak-data', async (data) => {
     let finalText = data.text;
     const sourceCode = data.sourceLang.split('-')[0];
@@ -197,34 +217,39 @@ socket.on('receive-speak-data', async (data) => {
     if (wrapper) wrapper.classList.add('speaking');
 
     if (sourceCode !== targetCode) {
-        setAIStatus('translating', 'AI Translating...');
+        if (data.isFinal !== false) setAIStatus('translating', 'AI Translating...');
         try {
             finalText = await translateText(data.text, sourceCode, targetCode);
         } catch (err) {
             console.error(err);
         }
-        setAIStatus('listening', 'AI Listening...');
+        if (data.isFinal !== false) setAIStatus('listening', 'AI Listening...');
     }
 
-    if (wrapper) setTimeout(() => wrapper.classList.remove('speaking'), 3000);
+    if (wrapper && data.isFinal !== false) setTimeout(() => wrapper.classList.remove('speaking'), 3000);
+
+    const currentCounter = ++subtitleCounter;
 
     if (subtitlesOn && finalText) {
         const subBox = document.getElementById('subtitle-text');
         const container = document.querySelector('.glass-subtitle');
         if (subBox) {
-            subBox.innerHTML = `<span style="color:var(--primary); font-weight:bold;">${data.username}:</span> ${finalText}`;
+            const suffix = data.isFinal === false ? ' <span style="opacity:0.6">...</span>' : '';
+            subBox.innerHTML = `<span style="color:var(--primary); font-weight:bold;">${data.username}:</span> ${finalText}${suffix}`;
             if (container) container.classList.add('visible');
 
-            setTimeout(() => {
-                // Only hide if it hasn't been overwritten by a newer message yet
-                if (subBox.innerHTML.includes(finalText) && container) {
-                    container.classList.remove('visible');
-                }
-            }, 6000);
+            if (data.isFinal !== false) {
+                setTimeout(() => {
+                    // Only hide if a new subtitle hasn't been emitted since this timer started
+                    if (subtitleCounter === currentCounter && container) {
+                        container.classList.remove('visible');
+                    }
+                }, 6000);
+            }
         }
     }
 
-    if (finalText) speakText(finalText, listenLang);
+    if (finalText && data.isFinal !== false) speakText(finalText, listenLang);
 });
 
 async function translateText(text, source, target) {
