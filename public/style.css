@@ -357,8 +357,14 @@ video {
     max-width: 800px;
     width: 100%;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    transition: opacity 0.3s;
+    transition: opacity 0.3s, transform 0.3s;
     opacity: 0;
+    transform: translateY(20px);
+}
+
+.glass-subtitle.visible {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 #subtitle-text {

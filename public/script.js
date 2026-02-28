@@ -213,12 +213,12 @@ socket.on('receive-speak-data', async (data) => {
         const container = document.querySelector('.glass-subtitle');
         if (subBox) {
             subBox.innerHTML = `<span style="color:var(--primary); font-weight:bold;">${data.username}:</span> ${finalText}`;
-            if (container) container.style.opacity = 1;
+            if (container) container.classList.add('visible');
 
             setTimeout(() => {
                 // Only hide if it hasn't been overwritten by a newer message yet
                 if (subBox.innerHTML.includes(finalText) && container) {
-                    container.style.opacity = 0;
+                    container.classList.remove('visible');
                 }
             }, 6000);
         }
