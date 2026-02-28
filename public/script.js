@@ -208,35 +208,48 @@ socket.on('receive-speak-data', async (data) => {
 
     if (wrapper) setTimeout(() => wrapper.classList.remove('speaking'), 3000);
 
-    if (subtitlesOn) {
+    if (subtitlesOn && finalText) {
         const subBox = document.getElementById('subtitle-text');
         const container = document.querySelector('.glass-subtitle');
-        subBox.innerHTML = `<span style="color:var(--primary); font-weight:bold;">${data.username}:</span> ${finalText}`;
-        if (container) container.style.opacity = 1;
+        if (subBox) {
+            subBox.innerHTML = `<span style="color:var(--primary); font-weight:bold;">${data.username}:</span> ${finalText}`;
+            if (container) container.style.opacity = 1;
 
-        setTimeout(() => {
-            if (subBox.innerHTML.includes(finalText) && container) {
-                container.style.opacity = 0;
-            }
-        }, 6000);
+            setTimeout(() => {
+                // Only hide if it hasn't been overwritten by a newer message yet
+                if (subBox.innerHTML.includes(finalText) && container) {
+                    container.style.opacity = 0;
+                }
+            }, 6000);
+        }
     }
 
-    speakText(finalText, listenLang);
+    if (finalText) speakText(finalText, listenLang);
 });
 
 async function translateText(text, source, target) {
-    const url = `${API_URL}&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
-    const res = await fetch(url);
-    const data = await res.json();
+    // If the user speaks the language they are listening to, don't translate
+    if (source.split('-')[0] === target.split('-')[0]) return text;
 
-    if (data && data[0]) {
-        // Google translate returns an array of sentences if the input is long. 
-        // Example: [ ["Hello.", "Bonjour.", ...], ["How are you?", "Comment..."] ]
-        // We must map through the array and join the first element of each inner array.
-        let fullTranslation = data[0].map(item => item[0]).join(' ');
-        return fullTranslation;
+    const url = `${API_URL}&sl=${source.split('-')[0]}&tl=${target.split('-')[0]}&dt=t&q=${encodeURIComponent(text)}`;
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data && data[0]) {
+            let fullTranslation = "";
+            for (let i = 0; i < data[0].length; i++) {
+                if (data[0][i][0]) {
+                    fullTranslation += data[0][i][0] + " ";
+                }
+            }
+            return fullTranslation.trim();
+        }
+        return text; // Fallback to original text if parsing fails
+    } catch (err) {
+        console.error("Translation API Error:", err);
+        return text; // Fallback to original text if network fails
     }
-    throw new Error("Translation failed");
 }
 
 function speakText(text, lang) {
