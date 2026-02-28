@@ -179,7 +179,9 @@ function initSpeechRecognition() {
 
         if (finalTranscript.trim() !== '') {
             socket.emit('speak-data', { roomId, text: finalTranscript.trim(), sourceLang: myLang, username: myUsername, isFinal: true });
+            displayLocalSubtitles(finalTranscript.trim(), true);
         } else if (interimTranscript.trim() !== '') {
+            displayLocalSubtitles(interimTranscript.trim(), false);
             const now = Date.now();
             if (now - lastInterimEmit > 1000) { // Limit live translation to once per second to prevent API bans
                 lastInterimEmit = now;
@@ -251,6 +253,27 @@ socket.on('receive-speak-data', async (data) => {
 
     if (finalText && data.isFinal !== false) speakText(finalText, listenLang);
 });
+
+// Helper to render user's own speech live (since WebRTC socket broadcast excludes sender)
+function displayLocalSubtitles(text, isFinal) {
+    if (!subtitlesOn) return;
+    const currentCounter = ++subtitleCounter;
+    const subBox = document.getElementById('subtitle-text');
+    const container = document.querySelector('.glass-subtitle');
+    if (subBox) {
+        const suffix = isFinal === false ? ' <span style="opacity:0.6">...</span>' : '';
+        subBox.innerHTML = `<span style="color:var(--primary); font-weight:bold;">You:</span> ${text}${suffix}`;
+        if (container) container.classList.add('visible');
+
+        if (isFinal !== false) {
+            setTimeout(() => {
+                if (subtitleCounter === currentCounter && container) {
+                    container.classList.remove('visible');
+                }
+            }, 6000);
+        }
+    }
+}
 
 async function translateText(text, source, target) {
     // If the user speaks the language they are listening to, don't translate
