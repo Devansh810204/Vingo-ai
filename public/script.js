@@ -21,6 +21,17 @@ let originalAudioOn = false; // Start with Original Audio muted
 
 // --- 1. SETUP & NAVIGATION ---
 
+// Add keyboard shortcuts for Enter key
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('username').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') goToSetup();
+    });
+
+    document.getElementById('room-id').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') joinRoom();
+    });
+});
+
 function goToSetup() {
     const input = document.getElementById('username');
     if (input.value.trim()) myUsername = input.value;
