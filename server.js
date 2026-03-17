@@ -1,8 +1,10 @@
 /* server.js */
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
 const path = require('path');
+const { GoogleGenAI } = require('@google/genai');
 
 const app = express();
 const server = http.createServer(app);
@@ -15,7 +17,10 @@ const io = new Server(server, {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Store user info: { socketId: { roomId, username, lang } }
+// Initialize Gemini Client (Will use process.env.GEMINI_API_KEY automatically if available)
+const ai = new GoogleGenAI({});
+
+// Store user info: { socketId: { roomId, username, myLang } }
 const users = {}; 
 
 io.on('connection', (socket) => {
@@ -63,8 +68,34 @@ io.on('connection', (socket) => {
 
     // Handle Translation Data (Broadcast to room)
     socket.on('speak-data', (data) => {
-        // data contains: { roomId, text, sourceLang, username }
+        // data contains: { roomId, text, sourceLang, username, isFinal }
         socket.broadcast.to(data.roomId).emit('receive-speak-data', data);
+    });
+
+    // Handle Secure Backend Translation via Gemini
+    socket.on('request-translation', async (data) => {
+        // data contains: { text, sourceCode, targetCode, contextToken }
+        if (!process.env.GEMINI_API_KEY) {
+            return socket.emit('translation-result', { error: "No API Key configured on server.", originalText: data.text, contextToken: data.contextToken });
+        }
+
+        try {
+            const prompt = `Translate the following text from ISO 639-1 code '${data.sourceCode}' to '${data.targetCode}'. Respond ONLY with the exact translated text without formatting, quotes, or markdown. Text: ${data.text}`;
+            
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+            });
+
+            socket.emit('translation-result', {
+                translatedText: response.text.trim(),
+                originalText: data.text,
+                contextToken: data.contextToken
+            });
+        } catch (error) {
+            console.error("Gemini API Error:", error);
+            socket.emit('translation-result', { error: "API Failure", originalText: data.text, contextToken: data.contextToken });
+        }
     });
 });
 

@@ -279,16 +279,16 @@ button:active {
     display: none;
 }
 
-/* Video Grid */
+/* Video Grid: Uses true CSS Grid to align unlimited participants neatly */
 #video-grid {
     flex: 1;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-content: center;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 15px;
     padding: 20px;
     overflow-y: auto;
+    align-content: center;
+    justify-content: center;
 }
 
 .video-wrapper {
@@ -306,12 +306,6 @@ button:active {
 .video-wrapper.speaking {
     border: 1px solid var(--primary);
     box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
-}
-
-@media (min-width: 800px) {
-    .video-wrapper {
-        width: 45%;
-    }
 }
 
 video {
@@ -437,4 +431,123 @@ video {
     background: #ff4757;
     box-shadow: 0 0 20px rgba(255, 71, 87, 0.4);
     color: #fff;
+}
+
+/* Chat Panel */
+.chat-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 320px;
+    height: calc(100vh - 90px); /* Leave room for bottom controls */
+    background: rgba(10, 10, 15, 0.95);
+    backdrop-filter: blur(20px);
+    border-left: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 45;
+}
+
+.chat-panel:not(.hidden) {
+    transform: translateX(0);
+}
+
+@media (max-width: 768px) {
+    .chat-panel {
+        width: 100%;
+        height: calc(100vh - 80px); /* Adjust for smaller controls height on mobile */
+    }
+}
+
+.chat-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #fff;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: none;
+    width: auto;
+    padding: 5px;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.chat-message {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px 15px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    color: #e0e0e0;
+}
+
+.chat-message.self {
+    background: rgba(0, 243, 255, 0.1);
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+}
+
+.chat-message.other {
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+}
+
+.msg-author {
+    font-size: 0.8rem;
+    color: var(--primary);
+    margin-bottom: 4px;
+    font-weight: bold;
+}
+
+.chat-input-area {
+    padding: 15px;
+    border-top: 1px solid var(--glass-border);
+    display: flex;
+    gap: 10px;
+}
+
+.chat-input-area input {
+    flex: 1;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+    padding: 10px 15px;
+    border-radius: 20px;
+    font-family: inherit;
+    outline: none;
+}
+
+.chat-input-area button {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: var(--primary);
+    color: #000;
 }

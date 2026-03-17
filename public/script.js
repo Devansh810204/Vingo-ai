@@ -1,7 +1,6 @@
 const socket = io();
 
 // --- CONFIGURATION ---
-const API_URL = "https://api.mymemory.translated.net/get?";
 const STUN_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 // --- STATE VARIABLES ---
@@ -74,6 +73,12 @@ async function joinRoom() {
     // Get selected languages
     myLang = document.getElementById('setup-my-lang').value;
     listenLang = document.getElementById('setup-listen-lang').value;
+    
+    // Unlock Speech Synthesis Engine for iOS/Safari
+    if (window.speechSynthesis) {
+        const unlockUtterance = new SpeechSynthesisUtterance('');
+        window.speechSynthesis.speak(unlockUtterance);
+    }
 
     // Sync UI
     document.getElementById('in-call-my-lang').value = myLang;
@@ -241,6 +246,7 @@ socket.on('receive-speak-data', async (data) => {
             if (container) container.classList.add('visible');
 
             if (data.isFinal !== false) {
+                appendChatMessage(data.username, finalText, false);
                 setTimeout(() => {
                     // Only hide if a new subtitle hasn't been emitted since this timer started
                     if (subtitleCounter === currentCounter && container) {
@@ -266,6 +272,7 @@ function displayLocalSubtitles(text, isFinal) {
         if (container) container.classList.add('visible');
 
         if (isFinal !== false) {
+            appendChatMessage('You', text, true);
             setTimeout(() => {
                 if (subtitleCounter === currentCounter && container) {
                     container.classList.remove('visible');
@@ -279,19 +286,21 @@ async function translateText(text, source, target) {
     // If the user speaks the language they are listening to, don't translate
     if (source.split('-')[0] === target.split('-')[0]) return text;
 
-    const url = `${API_URL}q=${encodeURIComponent(text)}&langpair=${source.split('-')[0]}|${target.split('-')[0]}`;
-    try {
-        const res = await fetch(url);
-        const data = await res.json();
-        
-        if (data && data.responseData && data.responseData.translatedText) {
-            return data.responseData.translatedText;
-        }
-        return text; // Fallback to original text if parsing fails
-    } catch(err) {
-        console.error("Translation API Error:", err);
-        return text; // Fallback to original text if network fails
-    }
+    return new Promise((resolve) => {
+        const contextToken = Math.random().toString(36).substring(7);
+        const timeout = setTimeout(() => resolve(text), 8000); // 8-second fallback
+
+        const listener = (data) => {
+            if (data.contextToken === contextToken) {
+                clearTimeout(timeout);
+                socket.off('translation-result', listener);
+                resolve(data.translatedText || data.originalText);
+            }
+        };
+
+        socket.on('translation-result', listener);
+        socket.emit('request-translation', { text, sourceCode: source.split('-')[0], targetCode: target.split('-')[0], contextToken });
+    });
 }
 
 function speakText(text, lang) {
@@ -426,3 +435,45 @@ function toggleOriginalAudio() {
 function leaveCall() {
     location.reload();
 }
+
+// --- 6. CHAT PANEL ---
+let chatOpen = false;
+
+function toggleChat() {
+    chatOpen = !chatOpen;
+    const panel = document.getElementById('chat-panel');
+    const btn = document.getElementById('chat-btn');
+    if (chatOpen) {
+        panel.classList.remove('hidden');
+        btn.classList.add('active');
+    } else {
+        panel.classList.add('hidden');
+        btn.classList.remove('active');
+    }
+}
+
+function sendManualChat() {
+    const input = document.getElementById('chat-msg-input');
+    const text = input.value.trim();
+    if (!text) return;
+    
+    appendChatMessage('You', text, true);
+    displayLocalSubtitles(text, true); // Optionally flash it on our own screen as a subtitle
+    socket.emit('speak-data', { roomId, text, sourceLang: myLang, username: myUsername, isFinal: true });
+    input.value = '';
+}
+
+function appendChatMessage(author, text, isSelf) {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+    const msg = document.createElement('div');
+    msg.className = `chat-message ${isSelf ? 'self' : 'other'}`;
+    msg.innerHTML = `<div class="msg-author">${author}</div><div>${text}</div>`;
+    container.appendChild(msg);
+    container.scrollTop = container.scrollHeight;
+}
+
+// Allow Enter key to send chat
+document.getElementById('chat-msg-input')?.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') sendManualChat();
+});

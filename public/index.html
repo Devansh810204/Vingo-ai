@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Vingo AI - Global Connect</title>
-    <link rel="stylesheet" href="style.css?v=5.0">
+    <link rel="stylesheet" href="style.css?v=6.0">
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600&display=swap" rel="stylesheet">
@@ -105,6 +105,18 @@
             </div>
         </div>
 
+        <div id="chat-panel" class="chat-panel hidden">
+            <div class="chat-header">
+                <h3>Live Chat & History</h3>
+                <button onclick="toggleChat()" class="close-btn">✖</button>
+            </div>
+            <div id="chat-messages" class="chat-messages"></div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-msg-input" placeholder="Type message...">
+                <button onclick="sendManualChat()">➔</button>
+            </div>
+        </div>
+
         <div class="controls-bar">
             <button onclick="toggleMute()" id="mute-btn" class="icon-btn" title="Microphone">
                 <span>🎤</span>
@@ -114,6 +126,9 @@
             </button>
             <button onclick="toggleSubtitles()" id="cc-btn" class="icon-btn active" title="Subtitles">
                 <span>📝</span>
+            </button>
+            <button onclick="toggleChat()" id="chat-btn" class="icon-btn" title="Open Chat">
+                <span>💬</span>
             </button>
             <button onclick="toggleOriginalAudio()" id="audio-btn" class="icon-btn danger"
                 title="Original Speaker Audio">
@@ -125,7 +140,7 @@
         </div>
     </div>
 
-    <script src="script.js?v=5.0"></script>
+    <script src="script.js?v=6.0"></script>
 </body>
 
 </html>
