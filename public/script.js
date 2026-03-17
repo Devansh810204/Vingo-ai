@@ -1,7 +1,7 @@
 const socket = io();
 
 // --- CONFIGURATION ---
-const API_URL = "https://translate.googleapis.com/translate_a/single?client=gtx";
+const API_URL = "https://api.mymemory.translated.net/get?";
 const STUN_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 // --- STATE VARIABLES ---
@@ -279,22 +279,16 @@ async function translateText(text, source, target) {
     // If the user speaks the language they are listening to, don't translate
     if (source.split('-')[0] === target.split('-')[0]) return text;
 
-    const url = `${API_URL}&sl=${source.split('-')[0]}&tl=${target.split('-')[0]}&dt=t&q=${encodeURIComponent(text)}`;
+    const url = `${API_URL}q=${encodeURIComponent(text)}&langpair=${source.split('-')[0]}|${target.split('-')[0]}`;
     try {
         const res = await fetch(url);
         const data = await res.json();
-
-        if (data && data[0]) {
-            let fullTranslation = "";
-            for (let i = 0; i < data[0].length; i++) {
-                if (data[0][i][0]) {
-                    fullTranslation += data[0][i][0] + " ";
-                }
-            }
-            return fullTranslation.trim();
+        
+        if (data && data.responseData && data.responseData.translatedText) {
+            return data.responseData.translatedText;
         }
         return text; // Fallback to original text if parsing fails
-    } catch (err) {
+    } catch(err) {
         console.error("Translation API Error:", err);
         return text; // Fallback to original text if network fails
     }
