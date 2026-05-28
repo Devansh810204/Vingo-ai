@@ -328,16 +328,108 @@ button:active {
     display: none;
 }
 
-/* Video Grid: Uses true CSS Grid to align unlimited participants neatly */
-#video-grid {
-    flex: 1;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+/* --- MEETING LAYOUT STRUCTURE --- */
+#meeting-container {
+    display: flex;
+    flex-direction: row;
+    height: calc(100vh - 200px); /* Leave room for top-bar (100px) and controls-bar (100px) */
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 20px;
     gap: 15px;
-    padding: 20px;
-    overflow-y: auto;
-    align-content: center;
+    position: relative;
+}
+
+#main-stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
     justify-content: center;
+    background: rgba(5, 5, 10, 0.4);
+    border-radius: 20px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
+    transition: all 0.3s ease;
+}
+
+#main-stage .video-wrapper.focused {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    border: none;
+    box-shadow: none;
+    max-width: none;
+}
+
+#main-stage .video-wrapper.focused video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Professional meeting layout */
+}
+
+#participants-container {
+    width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hide participants pane when alone in meeting room */
+#participants-container.alone {
+    display: none !important;
+}
+
+.participants-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.participants-header h4 {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.close-participants-btn {
+    display: none; /* Desktop only */
+}
+
+#participants-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+#participants-list::-webkit-scrollbar {
+    width: 6px;
+}
+#participants-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+/* Secondary video cards styled inside vertical container */
+#participants-list .video-wrapper {
+    cursor: pointer;
+    border: 2px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+}
+
+#participants-list .video-wrapper:hover {
+    border-color: var(--primary);
+    transform: scale(1.03);
 }
 
 .video-wrapper {
@@ -740,4 +832,164 @@ video {
     align-items: center;
     background: var(--primary);
     color: #000;
+}
+
+/* --- TOP-BAR ACTION STYLES --- */
+.top-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.participants-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: rgba(0, 243, 255, 0.1);
+    border: 1px solid var(--glass-border);
+    color: var(--primary);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: none;
+    transition: all 0.2s ease;
+    width: auto;
+}
+
+.participants-toggle-btn:hover {
+    background: rgba(0, 243, 255, 0.2);
+    border-color: var(--primary);
+    transform: translateY(-1px);
+}
+
+/* --- LIVE WALLPAPER MOUSE CLICK RIPPLE --- */
+.bg-ripple {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0, 243, 255, 0.4) 0%, rgba(112, 0, 255, 0) 70%);
+    border: 1px solid rgba(0, 243, 255, 0.3);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    animation: rippleExpand 0.8s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+    z-index: -1;
+}
+
+@keyframes rippleExpand {
+    0% {
+        width: 0px;
+        height: 0px;
+        opacity: 1;
+    }
+    100% {
+        width: 350px;
+        height: 350px;
+        opacity: 0;
+        border-color: rgba(112, 0, 255, 0);
+    }
+}
+
+/* --- RESPONSIVE MOBILE MEDIA QUERIES --- */
+@media (max-width: 768px) {
+    #meeting-container {
+        flex-direction: column;
+        height: calc(100vh - 170px);
+        padding: 10px;
+    }
+
+    #participants-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 50dvh;
+        background: rgba(10, 10, 15, 0.96);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        transform: translateY(100%);
+        z-index: 1000;
+        border-top-left-radius: 24px;
+        border-top-right-radius: 24px;
+        border-top: 1px solid var(--glass-border);
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8);
+        padding: 20px;
+        box-sizing: border-box;
+    }
+
+    #participants-container.active {
+        transform: translateY(0);
+    }
+
+    .close-participants-btn {
+        display: block;
+        background: none;
+        border: none;
+        color: #fff;
+        font-size: 1.2rem;
+        cursor: pointer;
+        padding: 5px;
+        box-shadow: none;
+        width: auto;
+    }
+
+    #participants-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 10px;
+        overflow-y: auto;
+    }
+
+    /* Small Screen Controls Adjustments */
+    .controls-bar {
+        height: 80px;
+        gap: 8px;
+        padding-bottom: 10px;
+        justify-content: center;
+    }
+
+    .control-btn {
+        min-width: 54px;
+        height: 56px;
+        border-radius: 12px;
+        padding: 4px 8px;
+        gap: 4px;
+    }
+
+    .control-btn .icon-svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .control-btn .btn-label {
+        font-size: 0.65rem;
+    }
+}
+
+/* Extra small mobile devices: hide button text labels to prevent overflow */
+@media (max-width: 480px) {
+    .controls-bar {
+        gap: 6px;
+    }
+
+    .control-btn {
+        min-width: 44px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        padding: 0;
+    }
+
+    .control-btn .btn-label {
+        display: none; /* Hide labels */
+    }
+
+    .control-btn .icon-svg {
+        width: 20px;
+        height: 20px;
+    }
 }

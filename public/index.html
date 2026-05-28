@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Vingo AI - Global Connect</title>
-    <link rel="stylesheet" href="style.css?v=6.0">
+    <link rel="stylesheet" href="style.css?v=7.0">
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600&display=swap" rel="stylesheet">
@@ -73,7 +73,12 @@
                 <span class="status-dot"></span>
                 <span id="ai-status-text">AI Initializing...</span>
             </div>
-            <button class="settings-btn" onclick="toggleSettings()">⚙️ Language</button>
+            <div class="top-bar-actions">
+                <button id="toggle-participants-btn" class="participants-toggle-btn" onclick="toggleMobileParticipants()">
+                    👥 Guests (<span id="participant-count">1</span>)
+                </button>
+                <button class="settings-btn" onclick="toggleSettings()">⚙️ Language</button>
+            </div>
         </div>
 
         <div id="settings-panel" class="settings-panel hidden">
@@ -99,10 +104,24 @@
             <button onclick="toggleSettings()" style="margin-top:10px; background: #ff4757;">Close</button>
         </div>
 
-        <div id="video-grid">
-            <div class="video-wrapper" id="local-wrapper">
-                <video id="local-video" autoplay muted playsinline></video>
-                <span class="label">You</span>
+        <!-- Meeting stage and participants lists -->
+        <div id="meeting-container">
+            <div id="main-stage">
+                <!-- Featured video. Default: Local wrapper -->
+                <div class="video-wrapper focused" id="local-wrapper" onclick="focusWrapper('local')">
+                    <video id="local-video" autoplay muted playsinline></video>
+                    <span class="label">You</span>
+                </div>
+            </div>
+            
+            <div id="participants-container">
+                <div class="participants-header">
+                    <h4>Other Guests</h4>
+                    <button onclick="toggleMobileParticipants()" class="close-participants-btn">✕</button>
+                </div>
+                <div id="participants-list">
+                    <!-- Remote videos will be dynamically inserted here -->
+                </div>
             </div>
         </div>
 
@@ -210,7 +229,7 @@
         </div>
     </div>
 
-    <script src="script.js?v=6.0"></script>
+    <script src="script.js?v=7.0"></script>
 </body>
 
 </html>

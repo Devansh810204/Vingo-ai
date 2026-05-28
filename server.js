@@ -83,7 +83,7 @@ io.on('connection', (socket) => {
             const prompt = `Translate the following text from ISO 639-1 code '${data.sourceCode}' to '${data.targetCode}'. Respond ONLY with the exact translated text without formatting, quotes, or markdown. Text: ${data.text}`;
             
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-2.5-pro',
                 contents: prompt,
             });
 
@@ -95,6 +95,50 @@ io.on('connection', (socket) => {
         } catch (error) {
             console.error("Gemini API Error:", error);
             socket.emit('translation-result', { error: "API Failure", originalText: data.text, contextToken: data.contextToken });
+        }
+    });
+
+    // Handle Mobile Audio Transcription via Gemini
+    socket.on('request-audio-transcription', async (data) => {
+        // data contains: { base64Audio, mimeType, sourceLang }
+        if (!process.env.GEMINI_API_KEY) {
+            console.warn("No Gemini API key configured for audio transcription.");
+            return;
+        }
+
+        try {
+            const prompt = `Transcribe the spoken words in this audio recording. The speaker is speaking in '${data.sourceLang}'. Return ONLY the exact transcribed text, without any additional comments, formatting, quotation marks, or meta-commentary. If there is only silence or no clear words, return nothing.`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-pro',
+                contents: [
+                    {
+                        inlineData: {
+                            data: data.base64Audio,
+                            mimeType: data.mimeType
+                        }
+                    },
+                    prompt
+                ]
+            });
+
+            const text = response.text.trim();
+            if (text && text.length > 1) {
+                console.log(`[Gemini Transcribed] Room ${users[socket.id]?.roomId} - ${users[socket.id]?.username}: ${text}`);
+                
+                const roomId = users[socket.id]?.roomId;
+                if (roomId) {
+                    io.to(roomId).emit('receive-speak-data', {
+                        userId: socket.id,
+                        text: text,
+                        sourceLang: data.sourceLang,
+                        username: users[socket.id]?.username || "User",
+                        isFinal: true
+                    });
+                }
+            }
+        } catch (error) {
+            console.error("Gemini Audio Transcription Error:", error);
         }
     });
 });

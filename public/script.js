@@ -13,6 +13,12 @@ let recognition;
 let subtitlesOn = true;
 const peers = {};
 
+// Mobile recording and focusing state
+let mobileRecorder;
+let mobileAudioChunks = [];
+let mobileRecordingInterval = null;
+let focusedId = "local";
+
 // --- CHANGED: Default Media State to OFF ---
 let isMuted = true;      // Start Muted
 let isVideoOff = true;   // Start with Camera Off
@@ -43,6 +49,29 @@ document.addEventListener('DOMContentLoaded', () => {
         if (orb1) orb1.style.transform = `translate(${x * 0.7}px, ${y * 0.7}px)`;
         if (orb2) orb2.style.transform = `translate(${x * -1.2}px, ${y * -1.2}px)`;
         if (orb3) orb3.style.transform = `translate(${x * 0.4}px, ${y * -0.4}px)`;
+    });
+
+    // Live Wallpaper Mouse Click Ripple Effects
+    document.addEventListener('click', (e) => {
+        const tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'SELECT' || tag === 'OPTION' || tag === 'TEXTAREA' ||
+            e.target.closest('video') || e.target.closest('.control-btn') || e.target.closest('.glass-card') || 
+            e.target.closest('.settings-panel') || e.target.closest('.chat-panel')) {
+            return;
+        }
+
+        const ripple = document.createElement('div');
+        ripple.className = 'bg-ripple';
+        ripple.style.left = `${e.clientX}px`;
+        ripple.style.top = `${e.clientY}px`;
+
+        const container = document.querySelector('.bg-orbs-container');
+        if (container) {
+            container.appendChild(ripple);
+            setTimeout(() => {
+                ripple.remove();
+            }, 1000);
+        }
     });
 
     // Initialize particles.js for the AI Theme Background
@@ -123,6 +152,9 @@ async function joinRoom() {
         // 4. Initialize Logic
         initSpeechRecognition();
         socket.emit('join-room', roomId, myUsername, myLang);
+        
+        // Initial participant count
+        updateParticipantCount();
 
     } catch (err) {
         console.error("Media Error:", err);
@@ -164,6 +196,12 @@ function updateLanguages() {
 // --- 2. SPEECH RECOGNITION ---
 
 function initSpeechRecognition() {
+    const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+        console.log("Mobile device detected. SpeechRecognition bypassed in favor of Gemini audio streaming.");
+        return;
+    }
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return alert("Browser not supported. Use Chrome.");
 
@@ -236,6 +274,12 @@ function setAIStatus(state, text) {
 let subtitleCounter = 0;
 
 socket.on('receive-speak-data', async (data) => {
+    // If it's our own transcribed speech from mobile, show local captions and chat, but skip TTS
+    if (data.userId === socket.id) {
+        displayLocalSubtitles(data.text, true);
+        return;
+    }
+
     let finalText = data.text;
     const sourceCode = data.sourceLang.split('-')[0];
     const targetCode = listenLang.split('-')[0];
@@ -362,8 +406,15 @@ socket.on('ice-candidate', async (data) => {
 socket.on('user-disconnected', (userId) => {
     if (peers[userId]) peers[userId].close();
     delete peers[userId];
+    
+    if (focusedId === userId) {
+        focusWrapper('local');
+    }
+    
     const el = document.getElementById(`wrapper-${userId}`);
     if (el) el.remove();
+    
+    updateParticipantCount();
 });
 
 function createPeer(userId, username) {
@@ -375,6 +426,7 @@ function createPeer(userId, username) {
             const div = document.createElement('div');
             div.className = 'video-wrapper';
             div.id = `wrapper-${userId}`;
+            div.onclick = () => focusWrapper(userId);
 
             const vid = document.createElement('video');
             vid.srcObject = event.streams[0];
@@ -388,7 +440,11 @@ function createPeer(userId, username) {
 
             div.appendChild(vid);
             div.appendChild(lbl);
-            document.getElementById('video-grid').appendChild(div);
+            
+            // Append to participants list sidebar
+            document.getElementById('participants-list').appendChild(div);
+            
+            updateParticipantCount();
         }
     };
 
@@ -416,13 +472,23 @@ function toggleMute() {
         if (label) label.innerText = isMuted ? "Unmute" : "Mute";
     }
 
+    const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
     if (isMuted) {
-        setAIStatus('', 'AI Standby');
-        document.getElementById('local-wrapper').classList.remove('speaking');
-        try { recognition.stop(); } catch (e) { }
+        if (isMobile) {
+            stopMobileRecording();
+        } else {
+            setAIStatus('', 'AI Standby');
+            document.getElementById('local-wrapper').classList.remove('speaking');
+            try { recognition.stop(); } catch (e) { }
+        }
     } else {
-        setAIStatus('listening', 'AI Listening...');
-        try { recognition.start(); } catch (e) { }
+        if (isMobile) {
+            startMobileRecording();
+        } else {
+            setAIStatus('listening', 'AI Listening...');
+            try { recognition.start(); } catch (e) { }
+        }
     }
 }
 
@@ -512,3 +578,152 @@ function appendChatMessage(author, text, isSelf) {
 document.getElementById('chat-msg-input')?.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') sendManualChat();
 });
+
+// --- 7. NEW MEETING LAYOUT & STAGE FOCUS FUNCTIONS ---
+
+function focusWrapper(targetId) {
+    if (focusedId === targetId) return;
+
+    const mainStage = document.getElementById('main-stage');
+    const participantsList = document.getElementById('participants-list');
+    if (!mainStage || !participantsList) return;
+
+    const currentFocusedWrapper = mainStage.querySelector('.video-wrapper');
+    const newFocusedWrapper = document.getElementById(targetId === 'local' ? 'local-wrapper' : `wrapper-${targetId}`);
+    if (!newFocusedWrapper) return;
+
+    // Swap positions
+    if (currentFocusedWrapper) {
+        currentFocusedWrapper.classList.remove('focused');
+        participantsList.appendChild(currentFocusedWrapper);
+        const vid = currentFocusedWrapper.querySelector('video');
+        if (vid) vid.play().catch(e => {});
+    }
+
+    newFocusedWrapper.classList.add('focused');
+    mainStage.appendChild(newFocusedWrapper);
+    const vid = newFocusedWrapper.querySelector('video');
+    if (vid) vid.play().catch(e => {});
+
+    focusedId = targetId;
+
+    // Close the drawer if we're on mobile
+    const container = document.getElementById('participants-container');
+    if (container) container.classList.remove('active');
+
+    updateParticipantCount();
+}
+
+function updateParticipantCount() {
+    const total = Object.keys(peers).length; // Remote counts
+    const badge = document.getElementById('participant-count');
+    if (badge) badge.innerText = total + 1; // Remote + Local
+
+    const container = document.getElementById('participants-container');
+    const toggleBtn = document.getElementById('toggle-participants-btn');
+
+    if (container) {
+        if (total === 0) {
+            // Hide on desktop if alone
+            container.classList.add('alone');
+            if (toggleBtn) toggleBtn.style.display = 'none';
+        } else {
+            container.classList.remove('alone');
+            if (toggleBtn) toggleBtn.style.display = 'inline-flex';
+        }
+    }
+}
+
+function toggleMobileParticipants() {
+    const container = document.getElementById('participants-container');
+    if (container) container.classList.toggle('active');
+}
+
+// --- 8. GEMINI MOBILE RECORDING PIPELINE ---
+
+function startMobileRecording() {
+    if (!localStream) return;
+
+    // Clear existing recording states
+    if (mobileRecordingInterval) clearInterval(mobileRecordingInterval);
+    if (mobileRecorder && mobileRecorder.state !== 'inactive') {
+        try { mobileRecorder.stop(); } catch(e) {}
+    }
+
+    mobileAudioChunks = [];
+
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (!audioTrack) return;
+
+    const audioStream = new MediaStream([audioTrack]);
+    try {
+        mobileRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
+    } catch(e) {
+        try {
+            // Fallback for Safari/iOS
+            mobileRecorder = new MediaRecorder(audioStream);
+        } catch(err) {
+            console.error("MediaRecorder not supported on this device:", err);
+            return;
+        }
+    }
+
+    mobileRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+            mobileAudioChunks.push(e.data);
+        }
+    };
+
+    mobileRecorder.onstop = () => {
+        const audioBlob = new Blob(mobileAudioChunks, { type: mobileRecorder.mimeType || 'audio/webm' });
+        mobileAudioChunks = [];
+
+        if (audioBlob.size < 1200) return; // Skip short noise blobs
+
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+            const base64Data = reader.result.split(',')[1];
+            socket.emit('request-audio-transcription', {
+                base64Audio: base64Data,
+                mimeType: mobileRecorder.mimeType || 'audio/webm',
+                sourceLang: myLang
+            });
+        };
+    };
+
+    setAIStatus('listening', 'AI Mobile Recording...');
+    document.getElementById('local-wrapper').classList.add('speaking');
+
+    try {
+        mobileRecorder.start();
+    } catch(e) {
+        console.error("Error starting mobile recording:", e);
+    }
+
+    // Capture voice block segments every 4 seconds
+    mobileRecordingInterval = setInterval(() => {
+        if (mobileRecorder && mobileRecorder.state === 'recording') {
+            try {
+                mobileRecorder.stop();
+                mobileRecorder.start();
+            } catch(e) {
+                console.error("Error cycling mobile recording:", e);
+            }
+        }
+    }, 4000);
+}
+
+function stopMobileRecording() {
+    if (mobileRecordingInterval) {
+        clearInterval(mobileRecordingInterval);
+        mobileRecordingInterval = null;
+    }
+
+    if (mobileRecorder && mobileRecorder.state !== 'inactive') {
+        try { mobileRecorder.stop(); } catch(e) {}
+    }
+
+    setAIStatus('', 'AI Standby');
+    document.getElementById('local-wrapper').classList.remove('speaking');
+}
