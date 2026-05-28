@@ -16,11 +16,18 @@
     <!-- Advanced Particle UI Background -->
     <div id="particles-js"></div>
 
+    <!-- Mouse-Reactive Animated Glassmorphic Orbs -->
+    <div class="bg-orbs-container">
+        <div id="bg-orb-1" class="bg-orb"></div>
+        <div id="bg-orb-2" class="bg-orb"></div>
+        <div id="bg-orb-3" class="bg-orb"></div>
+    </div>
+
     <div id="login-screen" class="screen active">
         <div class="glass-card">
             <h1>Vingo AI</h1>
             <p>Connect. Speak. Understand.</p>
-            <input type="text" id="username" placeholder="Enter your name">
+            <input type="text" id="username" placeholder="Choose Display Name">
             <button onclick="goToSetup()">Start Experience</button>
         </div>
     </div>
@@ -118,24 +125,87 @@
         </div>
 
         <div class="controls-bar">
-            <button onclick="toggleMute()" id="mute-btn" class="icon-btn" title="Microphone">
-                <span>🎤</span>
+            <!-- Microphone Control -->
+            <button onclick="toggleMute()" id="mute-btn" class="control-btn" title="Toggle Microphone">
+                <span class="icon-wrapper">
+                    <svg class="icon-svg mic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" x2="12" y1="19" y2="22"/>
+                    </svg>
+                    <svg class="icon-svg mic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="2" x2="22" y1="2" y2="22"/>
+                        <path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/>
+                        <path d="M5 10v1.7a7 7 0 0 0 12.07 4.9"/>
+                        <path d="M9 9h.01"/>
+                        <rect width="6" height="12" x="9" y="5" rx="3"/>
+                        <line x1="12" x2="12" y1="19" y2="22"/>
+                    </svg>
+                </span>
+                <span class="btn-label">Unmute</span>
             </button>
-            <button onclick="toggleVideo()" id="video-btn" class="icon-btn" title="Camera">
-                <span>📷</span>
+
+            <!-- Video/Camera Control -->
+            <button onclick="toggleVideo()" id="video-btn" class="control-btn danger" title="Toggle Camera">
+                <span class="icon-wrapper">
+                    <svg class="icon-svg video-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m22 8-6 4 6 4V8Z"/>
+                        <rect width="14" height="12" x="2" y="6" rx="2" ry="2"/>
+                    </svg>
+                    <svg class="icon-svg video-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="2" x2="22" y1="2" y2="22"/>
+                        <path d="m22 8-6 4 6 4V8Z"/>
+                        <path d="M2 17h12V6M2 6h4"/>
+                    </svg>
+                </span>
+                <span class="btn-label">Cam Off</span>
             </button>
-            <button onclick="toggleSubtitles()" id="cc-btn" class="icon-btn active" title="Subtitles">
-                <span>📝</span>
+
+            <!-- Subtitles/CC Control -->
+            <button onclick="toggleSubtitles()" id="cc-btn" class="control-btn active" title="Toggle Subtitles">
+                <span class="icon-wrapper">
+                    <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect width="20" height="14" x="2" y="5" rx="2"/>
+                        <path d="M7 15h4M7 9h10M11 12h6"/>
+                    </svg>
+                </span>
+                <span class="btn-label">Captions</span>
             </button>
-            <button onclick="toggleChat()" id="chat-btn" class="icon-btn" title="Open Chat">
-                <span>💬</span>
+
+            <!-- Chat Panel Control -->
+            <button onclick="toggleChat()" id="chat-btn" class="control-btn" title="Toggle Live Chat">
+                <span class="icon-wrapper">
+                    <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                </span>
+                <span class="btn-label">Chat</span>
             </button>
-            <button onclick="toggleOriginalAudio()" id="audio-btn" class="icon-btn danger"
-                title="Original Speaker Audio">
-                <span>🔇</span>
+
+            <!-- Original Audio Toggle -->
+            <button onclick="toggleOriginalAudio()" id="audio-btn" class="control-btn danger" title="Toggle Original Speaker Voice">
+                <span class="icon-wrapper">
+                    <svg class="icon-svg audio-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                    </svg>
+                    <svg class="icon-svg audio-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                        <line x1="22" x2="16" y1="9" y2="15"/>
+                        <line x1="16" x2="22" y1="9" y2="15"/>
+                    </svg>
+                </span>
+                <span class="btn-label">Orig. Audio</span>
             </button>
-            <button onclick="leaveCall()" class="icon-btn danger" title="Leave the Call">
-                <span>📞</span>
+
+            <!-- Leave Call Control -->
+            <button onclick="leaveCall()" class="control-btn danger solid" title="Leave Call">
+                <span class="icon-wrapper">
+                    <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/>
+                    </svg>
+                </span>
+                <span class="btn-label">End Call</span>
             </button>
         </div>
     </div>

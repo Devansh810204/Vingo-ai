@@ -31,22 +31,36 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') joinRoom();
     });
 
+    // Mouse-Reactive Interactive Parallax Orbs
+    document.addEventListener('mousemove', (e) => {
+        const x = (e.clientX - window.innerWidth / 2) / 30;
+        const y = (e.clientY - window.innerHeight / 2) / 30;
+
+        const orb1 = document.getElementById('bg-orb-1');
+        const orb2 = document.getElementById('bg-orb-2');
+        const orb3 = document.getElementById('bg-orb-3');
+
+        if (orb1) orb1.style.transform = `translate(${x * 0.7}px, ${y * 0.7}px)`;
+        if (orb2) orb2.style.transform = `translate(${x * -1.2}px, ${y * -1.2}px)`;
+        if (orb3) orb3.style.transform = `translate(${x * 0.4}px, ${y * -0.4}px)`;
+    });
+
     // Initialize particles.js for the AI Theme Background
     if (window.particlesJS) {
         particlesJS("particles-js", {
             "particles": {
-                "number": { "value": 80, "density": { "enable": true, "value_area": 800 } },
+                "number": { "value": 60, "density": { "enable": true, "value_area": 800 } },
                 "color": { "value": "#00f3ff" },
                 "shape": { "type": "circle" },
-                "opacity": { "value": 0.5, "random": false, "anim": { "enable": true, "speed": 1, "opacity_min": 0.1, "sync": false } },
-                "size": { "value": 3, "random": true, "anim": { "enable": false, "speed": 40, "size_min": 0.1, "sync": false } },
-                "line_linked": { "enable": true, "distance": 150, "color": "#7000ff", "opacity": 0.4, "width": 1 },
-                "move": { "enable": true, "speed": 2, "direction": "none", "random": false, "straight": false, "out_mode": "out", "bounce": false, "attract": { "enable": false, "rotateX": 600, "rotateY": 1200 } }
+                "opacity": { "value": 0.4, "random": false, "anim": { "enable": true, "speed": 0.5, "opacity_min": 0.1, "sync": false } },
+                "size": { "value": 2.5, "random": true, "anim": { "enable": false, "speed": 40, "size_min": 0.1, "sync": false } },
+                "line_linked": { "enable": true, "distance": 150, "color": "#7000ff", "opacity": 0.3, "width": 1 },
+                "move": { "enable": true, "speed": 1.5, "direction": "none", "random": false, "straight": false, "out_mode": "out", "bounce": false, "attract": { "enable": false, "rotateX": 600, "rotateY": 1200 } }
             },
             "interactivity": {
                 "detect_on": "canvas",
                 "events": { "onhover": { "enable": true, "mode": "grab" }, "onclick": { "enable": true, "mode": "push" }, "resize": true },
-                "modes": { "grab": { "distance": 140, "line_linked": { "opacity": 1 } }, "push": { "particles_nb": 4 } }
+                "modes": { "grab": { "distance": 140, "line_linked": { "opacity": 0.8 } }, "push": { "particles_nb": 3 } }
             },
             "retina_detect": true
         });
@@ -56,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function goToSetup() {
     const input = document.getElementById('username');
     if (input.value.trim()) myUsername = input.value;
-    else return alert("Please enter your name");
+    else return alert("Please enter a display name");
 
     document.getElementById('login-screen').classList.remove('active');
     document.getElementById('setup-screen').classList.add('active');
@@ -121,13 +135,20 @@ function updateInitialButtonState() {
     const muteBtn = document.getElementById('mute-btn');
     const videoBtn = document.getElementById('video-btn');
 
-    // Mute Button: Show Red (Off)
-    muteBtn.innerHTML = "<span>🔴</span>";
-    muteBtn.classList.remove('active'); // Remove 'active' (green) style
+    // Mute Button: Start Muted (Unmute action shown)
+    if (muteBtn) {
+        muteBtn.classList.remove('active');
+        const label = muteBtn.querySelector('.btn-label');
+        if (label) label.innerText = "Unmute";
+    }
 
-    // Video Button: Show Red (Off)
-    videoBtn.innerHTML = "<span>🚫</span>";
-    videoBtn.classList.add('danger');   // Add 'danger' (red) style
+    // Video Button: Start Cam Off (Cam On action shown)
+    if (videoBtn) {
+        videoBtn.classList.add('danger');
+        videoBtn.classList.remove('active');
+        const label = videoBtn.querySelector('.btn-label');
+        if (label) label.innerText = "Cam Off";
+    }
 }
 
 function updateLanguages() {
@@ -383,12 +404,17 @@ function toggleMute() {
     isMuted = !isMuted;
 
     // Toggle Track
-    if (localStream) localStream.getAudioTracks()[0].enabled = !isMuted;
+    if (localStream && localStream.getAudioTracks()[0]) {
+        localStream.getAudioTracks()[0].enabled = !isMuted;
+    }
 
     // Toggle UI
     const btn = document.getElementById('mute-btn');
-    btn.innerHTML = isMuted ? "<span>🔴</span>" : "<span>🎤</span>";
-    btn.classList.toggle('active', !isMuted);
+    if (btn) {
+        btn.classList.toggle('active', !isMuted);
+        const label = btn.querySelector('.btn-label');
+        if (label) label.innerText = isMuted ? "Unmute" : "Mute";
+    }
 
     if (isMuted) {
         setAIStatus('', 'AI Standby');
@@ -404,12 +430,18 @@ function toggleVideo() {
     isVideoOff = !isVideoOff;
 
     // Toggle Track
-    if (localStream) localStream.getVideoTracks()[0].enabled = !isVideoOff;
+    if (localStream && localStream.getVideoTracks()[0]) {
+        localStream.getVideoTracks()[0].enabled = !isVideoOff;
+    }
 
     // Toggle UI
     const btn = document.getElementById('video-btn');
-    btn.innerHTML = isVideoOff ? "<span>🚫</span>" : "<span>📷</span>";
-    btn.classList.toggle('danger', isVideoOff);
+    if (btn) {
+        btn.classList.toggle('danger', isVideoOff);
+        btn.classList.toggle('active', !isVideoOff);
+        const label = btn.querySelector('.btn-label');
+        if (label) label.innerText = isVideoOff ? "Cam Off" : "Cam On";
+    }
 }
 
 function toggleSubtitles() {
@@ -427,9 +459,12 @@ function toggleOriginalAudio() {
     });
 
     const btn = document.getElementById('audio-btn');
-    btn.innerHTML = originalAudioOn ? "<span>🔊</span>" : "<span>🔇</span>";
-    btn.classList.toggle('danger', !originalAudioOn);
-    btn.classList.toggle('active', originalAudioOn);
+    if (btn) {
+        btn.classList.toggle('danger', !originalAudioOn);
+        btn.classList.toggle('active', originalAudioOn);
+        const label = btn.querySelector('.btn-label');
+        if (label) label.innerText = originalAudioOn ? "Orig. On" : "Orig. Off";
+    }
 }
 
 function leaveCall() {
