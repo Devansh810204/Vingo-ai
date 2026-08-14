@@ -1,131 +1,118 @@
-# VoiceBridge - Real-Time Video Translator
+# Vingo AI - Real-Time Multilingual Meeting Platform
 
-A real-time video calling application with automatic voice translation capabilities. Connect with people globally and break language barriers instantly.
-
-## Features
-
-- 🎥 **Real-time Video Calling** - WebRTC-powered peer-to-peer video calls
-- 🗣️ **Speech Recognition** - Automatic speech-to-text conversion
-- 🌍 **Multi-Language Translation** - Support for 6+ languages (English, Spanish, French, Hindi, German, Japanese)
-- 🔊 **Text-to-Speech** - Translated text spoken in target language
-- 📝 **Live Subtitles** - Toggle-able subtitle display
-- 🎤 **Audio Controls** - Mute/unmute functionality
-- 📱 **Cross-Platform** - Works on desktop and mobile devices
-
-## Technologies Used
-
-- **Backend**: Node.js, Express, Socket.io
-- **Frontend**: HTML5, CSS3, JavaScript (Vanilla)
-- **Real-time Communication**: WebRTC, Socket.io
-- **Speech APIs**: Web Speech API, Speech Synthesis API
-- **Translation**: MyMemory Translation API
-
-## Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/voice-translator.git
-cd voice-translator
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Start the server:
-```bash
-npm start
-```
-
-4. Open your browser and navigate to:
-- Local: `http://localhost:3000`
-- Network: `http://YOUR_LOCAL_IP:3000`
-
-## Usage
-
-1. **Login**: Enter any username to continue
-2. **Setup**: 
-   - Enter a room name
-   - Select your spoken language
-   - Select target language for translation
-3. **Start Call**: Join the video room
-4. **Communicate**: Speak naturally - your speech will be translated in real-time
-
-## Language Support
-
-- English (en-US)
-- Spanish (es-ES)
-- French (fr-FR)
-- Hindi (hi-IN)
-- German (de-DE)
-- Japanese (ja-JP)
-
-## Deployment
-
-### For Production Use:
-
-1. **Frontend**: Deploy to Vercel, Netlify, or GitHub Pages
-2. **Backend**: Deploy to Heroku, Railway, or Render
-3. **Environment**: Ensure HTTPS is enabled for microphone access
-
-### Environment Variables:
-```bash
-PORT=3000
-NODE_ENV=production
-```
-
-## API Integration
-
-The app uses [MyMemory Translation API](https://api.mymemory.translated.net) for free translation services. For production use, consider upgrading to their premium API for higher limits.
-
-## Browser Compatibility
-
-- ✅ Chrome/Chromium (Recommended)
-- ✅ Firefox
-- ✅ Edge
-- ⚠️ Safari (Limited WebRTC support)
-
-## Security Notes
-
-- HTTPS required for microphone/camera access in production
-- SSL certificates automatically handled by deployment platforms
-- No sensitive data stored locally
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-For issues and questions:
-- Open an issue on GitHub
-- Check the troubleshooting section below
-
-## Troubleshooting
-
-**Microphone not working?**
-- Ensure HTTPS is enabled (production) or use localhost (development)
-- Check browser permissions for microphone access
-- Try Chrome with insecure content enabled for testing
-
-**Video not connecting?**
-- Both users need stable internet connection
-- Check firewall settings
-- Ensure WebRTC ports are not blocked
-
-**Translation not working?**
-- Check internet connection
-- Verify MyMemory API is accessible
-- Try different language combinations
+Vingo AI is a real-time web-based video conferencing platform designed to break language barriers in global communication. Combining WebRTC peer-to-peer media streaming with state-of-the-art Large Language Models (LLMs), Vingo AI delivers live speech-to-text transcription, translation, and text-to-speech synthesis directly during active video calls.
 
 ---
 
-Made with ❤️ for breaking language barriers globally.
+## 🎥 Key Features
+
+- 🎥 **Real-time Video Calling** - Peer-to-peer WebRTC video and audio channels.
+- 🗣️ **Multilingual Live Subtitles** - Live translation overlays for speakers of different languages.
+- 🔊 **Translated Text-to-Speech** - Direct target-language voice synthesis for incoming foreign speech.
+- 💬 **Live Chat & History** - Scrollable chat sidebar showing original and translated messages.
+- 👥 **Adaptive Focus Layout** - Main Stage featured screen with a vertical participants sidebar (desktop) or togglable slide-up bottom drawer (mobile).
+- 🖱️ **Interactive Wallpaper** - Mouse-following parallax gradients and expanding tactile ripple effects on cursor clicks.
+
+---
+
+## 🛠️ Technology Stack
+
+### Backend
+- **Node.js & Express:** Serves static frontend client files and handles API route management.
+- **Socket.io:** Powers real-time WebRTC signaling and data event routing between peers.
+
+### AI Engine (Large Language Model)
+- **Google Gen AI Node SDK (`@google/genai`):** Backed by the **`gemini-2.5-pro`** model to perform:
+  - *Audio transcription (STT):* Processing binary mobile audio chunks.
+  - *Contextual translation (L2L):* High-accuracy translations between supported languages.
+
+### Frontend
+- **WebRTC (`RTCPeerConnection`):** Handles camera/microphone hardware feeds and peer stream handshakes.
+- **Web Speech API (`SpeechRecognition`):** Performs local real-time speech-to-text dictation on desktop Chrome.
+- **SpeechSynthesis API:** Plays back synthesized speech in the listener's target language.
+- **MediaRecorder API:** Captures microphone streams in binary blocks on mobile devices.
+- **CSS3 Variables & Grid/Flexbox:** Renders a modern glassmorphic theme with responsive mobile dimensions.
+
+---
+
+## 📐 System Architecture
+
+Below is the operational flow diagram for Vingo AI:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Alice as Alice (Desktop Client)
+    actor Bob as Bob (Android Client)
+    participant Srv as Node.js Server
+    participant Gem as Google Gemini 2.5 Pro
+
+    Note over Alice, Bob: 1. WEBRTC MEDIA CONNECT
+    Alice->>Srv: Join Room
+    Bob->>Srv: Join Room
+    Alice->>Srv: Offer SDP
+    Bob->>Srv: Answer SDP
+    Note over Alice, Bob: Peer-to-Peer Media Established
+
+    Note over Bob, Gem: 2. MOBILE GEMINI TRANSCRIPTION PIPELINE
+    Bob->>Bob: MediaRecorder captures 4s audio chunk
+    Bob->>Srv: request-audio-transcription (base64 audio)
+    Srv->>Gem: Generate content (Audio file + Transcribe prompt)
+    Gem-->>Srv: Return transcribed text
+    Srv-->>Alice: receive-speak-data (transcribed text)
+    Srv-->>Bob: receive-speak-data (transcribed text)
+
+    Note over Alice, Gem: 3. RECEIVER TRANSLATION & TTS PLAYBACK
+    Alice->>Srv: request-translation (text, targetLang)
+    Srv->>Gem: Generate content (Translate prompt)
+    Gem-->>Srv: Return translated text
+    Srv-->>Alice: translation-result (translated text)
+    Alice->>Alice: Display Subtitles & Play SpeechSynthesis
+```
+
+---
+
+## 🚀 Installation & Local Run
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Devansh810204/Vingo-ai.git
+   cd Vingo-ai
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Configure Environment Variables:**
+   Create a `.env` file in the root directory and add your Google Gemini API Key:
+   ```env
+   GEMINI_API_KEY=your_gemini_api_key_here
+   PORT=3000
+   ```
+
+4. **Start the server:**
+   ```bash
+   npm start
+   ```
+   Or run in development mode with hot-reloading:
+   ```bash
+   npm run dev
+   ```
+
+5. **Access the application:**
+   Open your browser and navigate to:
+   - Local: `http://localhost:3000`
+   - Network (for other devices): `http://<YOUR_LOCAL_IP>:3000`
+   *(Note: HTTPS is required for microphone/camera permissions when testing across separate network devices.)*
+
+---
+
+## 📱 Mobile Compatibility & Hardware Conflict Solutions
+
+To bypass mobile browser limits where WebRTC microphone capture locks out client-side Web Speech SpeechRecognition, Vingo AI leverages:
+- **Audio Recorders:** Capturing raw local audio slices (4 seconds) via `MediaRecorder`.
+- **Backend Speech-to-Text:** Submitting the raw audio data to the backend for transcription through the multimodal `gemini-2.5-pro` API.
+- **Feedback Loop Protection:** Filtering out incoming speak-data matching the sender's client socket ID to block self-earpiece feedback.
+- **Mobile Responsive Controls:** Automatically resizing layouts and hiding button text labels on screens `<= 480px` to fit controls on a single row.
